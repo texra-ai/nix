@@ -1,0 +1,52 @@
+name: Update package to latest npm release
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 7 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Check npm for a new version and update package.nix
+        id: bump
+        run: |
+          set -euo pipefail
+          LATEST=$(curl -fsSL https://registry.npmjs.org/@texra-ai/cli/latest | jq -r .version)
+          CURRENT=$(sed -n 's|.*version = "\(.*\)";.*|\1|p' package.nix | head -1)
+          echo "current=$CURRENT latest=$LATEST"
+          if [ "$LATEST" = "$CURRENT" ]; then
+            echo "Package already at $LATEST"
+            exit 0
+          fi
+          SHA256_HEX=$(curl -fsSL "https://registry.npmjs.org/@texra-ai/cli/-/cli-${LATEST}.tgz" | sha256sum | cut -d' ' -f1)
+          SRI="sha256-$(echo "$SHA256_HEX" | xxd -r -p | base64)"
+          sed -i "s|version = \".*\";|version = \"${LATEST}\";|" package.nix
+          sed -i "s|hash = \"sha256-.*\";|hash = \"${SRI}\";|" package.nix
+          echo "version=$LATEST" >> "$GITHUB_OUTPUT"
+
+      - name: Build and smoke test
+        if: steps.bump.outputs.version != ''
+        uses: DeterminateSystems/nix-installer-action@v21
+
+      - name: Verify
+        if: steps.bump.outputs.version != ''
+        run: |
+          nix build .#texra --print-build-logs
+          ./result/bin/texra --version
+
+      - name: Commit and push
+        if: steps.bump.outputs.version != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.nix flake.lock
+          git commit -m "texra ${{ steps.bump.outputs.version }}"
+          git push
