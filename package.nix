@@ -9,11 +9,11 @@
 }:
 stdenv.mkDerivation rec {
   pname = "texra-cli";
-  version = "0.38.9";
+  version = "0.38.10";
 
   src = fetchurl {
     url = "https://registry.npmjs.org/@texra-ai/cli/-/cli-${version}.tgz";
-    hash = "sha256-h2ukEMDvGBndYiMWDJJoxMKf9uQshZSntojGf41MCag=";
+    hash = "sha256-bDZShg+pMvGzlQZZPbtueDECORKEdSidsbYexvjOFNY=";
   };
 
   nativeBuildInputs = [ makeWrapper ];
