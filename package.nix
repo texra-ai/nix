@@ -16,10 +16,15 @@ stdenv.mkDerivation rec {
     hash = "sha256-9S1nHsCxejz8HbSQFIZ1iAZfEJEsX5CXyOwMn58JpRo=";
   };
 
-  nativeBuildInputs = [ makeWrapper ];
+  nativeBuildInputs = [
+    makeWrapper
+    nodejs_22
+  ];
 
   installPhase = ''
     runHook preInstall
+    export HOME="$TMPDIR"
+    npm install --ignore-scripts --omit=dev
     mkdir -p $out/lib/texra-cli $out/bin
     cp -r . $out/lib/texra-cli/
     makeWrapper ${nodejs_22}/bin/node $out/bin/texra \
