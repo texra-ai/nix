@@ -6,7 +6,6 @@
   fetchurl,
   makeWrapper,
   importNpmLock,
-  nodejs,
   nodejs_22,
 }:
 stdenv.mkDerivation rec {
@@ -45,10 +44,6 @@ stdenv.mkDerivation rec {
     tar -xzf "$src"
     sourceRoot=package
     runHook postUnpack
-  '';
-
-  postPatch = ''
-    cp ${./package-lock.json} package-lock.json
   '';
 
   installPhase = ''
