@@ -30,6 +30,29 @@ jobs:
           SRI="sha256-$(echo "$SHA256_HEX" | xxd -r -p | base64)"
           sed -i "s|version = \".*\";|version = \"${LATEST}\";|" package.nix
           sed -i "s|hash = \"sha256-.*\";|hash = \"${SRI}\";|" package.nix
+          # The CLI tarball supplies its executable but not all runtime npm
+          # dependencies. Regenerate the minimal production lockfile for every
+          # release so the derivation vendors the matching dependency graph.
+          curl -fsSL "https://registry.npmjs.org/@texra-ai/cli/${LATEST}" |
+            jq '.dependencies // {}' > .texra-runtime-dependencies.json
+          export LATEST
+          node <<'NODE'
+          const fs = require('node:fs');
+          const dependencies = JSON.parse(
+            fs.readFileSync('.texra-runtime-dependencies.json', 'utf8'),
+          );
+          fs.writeFileSync(
+            'package.json',
+            JSON.stringify({
+              name: '@texra-ai/cli',
+              version: process.env.LATEST,
+              bin: { texra: 'dist/bin/texra.js' },
+              dependencies,
+            }, null, 2) + '\n',
+          );
+          NODE
+          npm install --package-lock-only --omit=dev --ignore-scripts --no-audit --no-fund
+          rm package.json .texra-runtime-dependencies.json
           echo "version=$LATEST" >> "$GITHUB_OUTPUT"
 
       - name: Build and smoke test
@@ -47,6 +70,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.nix flake.lock
+          git add package.nix package-lock.json flake.lock
           git commit -m "texra ${{ steps.bump.outputs.version }}"
           git push
