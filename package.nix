@@ -5,21 +5,54 @@
   stdenv,
   fetchurl,
   makeWrapper,
+  importNpmLock,
   nodejs_22,
 }:
 stdenv.mkDerivation rec {
   pname = "texra-cli";
-  version = "0.39.3";
+  version = "0.40.3";
 
   src = fetchurl {
     url = "https://registry.npmjs.org/@texra-ai/cli/-/cli-${version}.tgz";
-    hash = "sha256-9S1nHsCxejz8HbSQFIZ1iAZfEJEsX5CXyOwMn58JpRo=";
+    hash = "sha256-i3+ao7QIntoaP+23zsl9eiN3BtZMRzYW64xyzBYIacI=";
   };
 
-  nativeBuildInputs = [ makeWrapper ];
+  nativeBuildInputs = [
+    makeWrapper
+    nodejs_22
+  ];
+
+  npmDeps = importNpmLock {
+    npmRoot = ./.;
+    package = builtins.fromJSON ''
+      {
+        "name": "@texra-ai/cli",
+        "version": "${version}",
+        "bin": {
+          "texra": "dist/bin/texra.js"
+        },
+        "dependencies": {
+          "@inkjs/ui": "^2.0.0",
+          "clipboardy": "^5.3.2"
+        }
+      }
+    '';
+  };
+
+  unpackPhase = ''
+    runHook preUnpack
+    tar -xzf "$src"
+    sourceRoot=package
+    runHook postUnpack
+  '';
 
   installPhase = ''
     runHook preInstall
+    export HOME="$TMPDIR"
+    export npm_config_cache="$TMPDIR/npm-cache"
+    cp ${npmDeps}/package.json package.json
+    cp ${npmDeps}/package-lock.json package-lock.json
+    npm ci --ignore-scripts --omit=dev
     mkdir -p $out/lib/texra-cli $out/bin
     cp -r . $out/lib/texra-cli/
     makeWrapper ${nodejs_22}/bin/node $out/bin/texra \
